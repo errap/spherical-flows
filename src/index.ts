@@ -20,8 +20,7 @@ function createCamera() {
 }
 
 function createOrbitControls(camera: THREE.Camera, renderer: THREE.Renderer) {
-  const controls = new OrbitControls(camera, renderer.domElement);
-  return controls;
+  return new OrbitControls(camera, renderer.domElement);
 }
 
 function main() {
@@ -60,10 +59,10 @@ function main() {
   // prettier-ignore
   const indices = [
     // Base
-    2, 1, 0, 
-    3, 2, 0, 
-    4, 3, 0, 
-    5, 4, 0, 
+    2, 1, 0,
+    3, 2, 0,
+    4, 3, 0,
+    5, 4, 0,
     6, 5, 0,
     1, 6, 0,
     // First floor sides
@@ -97,23 +96,12 @@ function main() {
       );
     }
 
-    indices.push(
-      z + (z + 1) * polygonSides + 2,
-      z + (z + 2) * polygonSides + 1,
-      z + z * polygonSides + 1
-    );
-    indices.push(
-      z + (z + 2) * polygonSides + 1,
-      z + (z + 1) * polygonSides,
-      z + z * polygonSides + 1
-    );
+    indices.push(z + (z + 1) * polygonSides + 2, z + (z + 2) * polygonSides + 1, z + z * polygonSides + 1);
+    indices.push(z + (z + 2) * polygonSides + 1, z + (z + 1) * polygonSides, z + z * polygonSides + 1);
   }
 
   geometry.setIndex(indices);
-  geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(vertices, 3)
-  );
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
   geometry.computeVertexNormals();
   const object = new THREE.Mesh(geometry, new THREE.MeshNormalMaterial());
   scene.add(object);
