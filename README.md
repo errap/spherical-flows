@@ -2,6 +2,8 @@
 
 Repository for simulating flow fields on a sphere surface.
 
+![Demo](./docs/demo.gif)
+
 ## Development
 
 - Run `npm i` to install all dependencies
