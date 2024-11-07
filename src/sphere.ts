@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { Simulation } from "./simulation";
 import { getGradient } from "./color";
 
-const gradient = getGradient("ice");
+const gradient = getGradient("spectral");
 
 export class Sphere {
   private geometry = new THREE.BufferGeometry();

@@ -32,8 +32,8 @@ const createParticle = () => {
 
   // Generate random velocity in tangent plane
   const velocityX = Math.random() * 0.01 - 0.005;
-  const velocityY = Math.random() * 0.01 - 0.005;
-  const velocityZ = Math.random() * 0.01 - 0.005;
+  const velocityY = Math.random() * 0.001 - 0.0005;
+  const velocityZ = Math.random() * 0.001 - 0.0005;
 
   return {
     position: { theta, phi },
@@ -66,13 +66,13 @@ export class Simulation {
     return { theta: Math.atan2(cart.y, cart.x), phi: Math.acos(cart.z / r) };
   }
 
-  update(deltaTime: number = 0.1) {
+  update(deltaTime: number = 0.05) {
     this.particles.forEach((particle) => {
       const cartesianPosition = this.fromPolarToCartesian(particle.position);
 
       const vectorFieldVelocity = this.vectorField(cartesianPosition.x, cartesianPosition.y, cartesianPosition.z);
-      particle.velocity.x += 0.1 * vectorFieldVelocity.x * deltaTime;
-      particle.velocity.y += 0.1 * vectorFieldVelocity.y * deltaTime;
+      particle.velocity.x += 0.05 * vectorFieldVelocity.x * deltaTime;
+      particle.velocity.y += 0.05 * vectorFieldVelocity.y * deltaTime;
 
       cartesianPosition.x += particle.velocity.x * deltaTime;
       cartesianPosition.y += particle.velocity.y * deltaTime;

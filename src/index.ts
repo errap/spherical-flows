@@ -5,12 +5,12 @@ import { Sphere } from "./sphere";
 import { Fade } from "./fade";
 
 const createCamera = () => {
-  const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 100);
+  const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000);
   camera.up = new THREE.Vector3(0, 0, 1);
   camera.lookAt(new THREE.Vector3(0, 0, 0));
-  camera.translateX(10);
-  camera.translateY(10);
-  camera.translateZ(10);
+  camera.translateX(100);
+  camera.translateY(100);
+  camera.translateZ(100);
 
   return camera;
 };
@@ -40,7 +40,7 @@ const main = () => {
   const gl = renderer.getContext();
   const { scene, camera } = createScene();
 
-  const sphere = new Sphere(5);
+  const sphere = new Sphere(50);
   const simulation = new Simulation({ numberOfParticles: 100000 });
 
   sphere.init({ simulation, scene });
@@ -50,7 +50,7 @@ const main = () => {
   const controls = createOrbitControls(camera, renderer);
   controls.update();
 
-  const fade = new Fade(0.002);
+  const fade = new Fade(0.05);
 
   // const svgRenderer = new SVGRenderer();
   // svgRenderer.setSize(window.innerWidth, window.innerHeight);
