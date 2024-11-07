@@ -1,78 +1,31 @@
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { Simulation } from "./simulation";
-import { Sphere } from "./sphere";
 import { Fade } from "./fade";
-
-const createCamera = () => {
-  const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000);
-  camera.up = new THREE.Vector3(0, 0, 1);
-  camera.lookAt(new THREE.Vector3(0, 0, 0));
-  camera.translateX(100);
-  camera.translateY(100);
-  camera.translateZ(100);
-
-  return camera;
-};
-
-const createOrbitControls = (camera: THREE.Camera, renderer: THREE.Renderer) => {
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.autoRotate = false;
-  return controls;
-};
-
-const createScene = () => {
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000);
-  const camera = createCamera();
-
-  return { scene, camera };
-};
+import { Renderer } from "./renderer";
+import { getGradient } from "./color";
 
 const main = () => {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-  renderer.autoClearColor = false;
+  const renderer = new Renderer();
+  const simulation = new Simulation({
+    numberOfParticles: 100000,
+    sphereRadius: 50,
+    backgroundColor: 0x000,
+    particleSize: 0.01,
+    gradient: getGradient("spectral"),
+  });
+  const fade = new Fade({ alpha: 0.05 });
 
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
+  renderer.init();
+  simulation.init();
 
-  const gl = renderer.getContext();
-  const { scene, camera } = createScene();
-
-  const sphere = new Sphere(50);
-  const simulation = new Simulation({ numberOfParticles: 100000 });
-
-  sphere.init({ simulation, scene });
-
-  renderer.render(scene, camera);
-
-  const controls = createOrbitControls(camera, renderer);
-  controls.update();
-
-  const fade = new Fade(0.05);
-
-  // const svgRenderer = new SVGRenderer();
-  // svgRenderer.setSize(window.innerWidth, window.innerHeight);
-  // document.body.appendChild(svgRenderer.domElement);
-  // svgRenderer.render(scene, camera);
+  simulation.addToRenderer(renderer);
+  fade.addToRenderer(renderer);
 
   let step = 0;
   function animate() {
     requestAnimationFrame(animate);
 
-    // required if controls.enableDamping or controls.autoRotate are set to true
-    controls.update();
-
-    simulation.update();
-    sphere.update(simulation, step);
-
-    // Enable and configure blending
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-    renderer.render(scene, camera);
-    fade.render(renderer);
+    simulation.update({ deltaTime: 1, step });
+    renderer.render();
 
     step += 1;
   }

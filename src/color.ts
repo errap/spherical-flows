@@ -1,5 +1,7 @@
 import chroma from "./lib/chroma";
 
+export type Gradient = ReturnType<typeof getGradient>;
+
 const easeOutSine = (x: number) => {
   return Math.sin((x * Math.PI) / 2);
 };

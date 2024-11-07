@@ -1,4 +1,6 @@
 import { getPerlinNoiseVectorFn } from "./noise";
+import { GlParticles, GlParticlesConstructorProps } from "./glParticles";
+import { Renderer } from "./renderer";
 
 interface PolarCoordinates {
   theta: number;
@@ -41,21 +43,39 @@ const createParticle = () => {
   };
 };
 
+interface SimulationConstructorProps extends GlParticlesConstructorProps {
+  numberOfParticles: number;
+}
+
+/**
+ * Class representing a simulation of particles on the surface of a sphere.
+ * They move according to their own velocity and a vector field generated with perlin noise.
+ */
 export class Simulation {
-  private readonly radius: number;
+  private readonly glParticles: GlParticles;
+  private readonly sphereRadius: number;
   private readonly vectorField: (x: number, y: number, z: number) => Vector2D;
   particles: Particle[] = [];
 
-  constructor({ numberOfParticles, radius = 1 }: { numberOfParticles: number; radius?: number }) {
-    this.vectorField = getPerlinNoiseVectorFn({ resolution: 0.5 });
-    this.radius = radius;
-    this.particles = new Array(numberOfParticles).fill(0).map(createParticle);
+  constructor(props: SimulationConstructorProps) {
+    this.vectorField = getPerlinNoiseVectorFn({ resolution: 0.05 });
+    this.sphereRadius = props.sphereRadius;
+    this.particles = new Array(props.numberOfParticles).fill(0).map(createParticle);
+    this.glParticles = new GlParticles(props);
+  }
+
+  init() {
+    this.glParticles.init({ simulation: this });
+  }
+
+  addToRenderer(renderer: Renderer) {
+    this.glParticles.addToRenderer(renderer);
   }
 
   fromPolarToCartesian(coords: PolarCoordinates): Vector3D {
-    const x = this.radius * Math.sin(coords.phi) * Math.cos(coords.theta);
-    const y = this.radius * Math.sin(coords.phi) * Math.sin(coords.theta);
-    const z = this.radius * Math.cos(coords.phi);
+    const x = this.sphereRadius * Math.sin(coords.phi) * Math.cos(coords.theta);
+    const y = this.sphereRadius * Math.sin(coords.phi) * Math.sin(coords.theta);
+    const z = this.sphereRadius * Math.cos(coords.phi);
 
     return { x, y, z };
   }
@@ -66,7 +86,7 @@ export class Simulation {
     return { theta: Math.atan2(cart.y, cart.x), phi: Math.acos(cart.z / r) };
   }
 
-  update(deltaTime: number = 0.05) {
+  update({ deltaTime, step }: { deltaTime: number; step: number }) {
     this.particles.forEach((particle) => {
       const cartesianPosition = this.fromPolarToCartesian(particle.position);
 
@@ -83,18 +103,18 @@ export class Simulation {
       );
 
       // Normalize to move it back to the Earth's surface
-      cartesianPosition.x *= this.radius / newRadialDistance;
-      cartesianPosition.y *= this.radius / newRadialDistance;
-      cartesianPosition.z *= this.radius / newRadialDistance;
+      cartesianPosition.x *= this.sphereRadius / newRadialDistance;
+      cartesianPosition.y *= this.sphereRadius / newRadialDistance;
+      cartesianPosition.z *= this.sphereRadius / newRadialDistance;
 
       // Update the plane's position
       particle.position = this.fromCartesianToPolar(cartesianPosition);
 
       // Now also update the velocity vector to reflect it being on the sphere
       const surfaceNormal = {
-        x: cartesianPosition.x / this.radius,
-        y: cartesianPosition.y / this.radius,
-        z: cartesianPosition.z / this.radius,
+        x: cartesianPosition.x / this.sphereRadius,
+        y: cartesianPosition.y / this.sphereRadius,
+        z: cartesianPosition.z / this.sphereRadius,
       };
       const dotProduct =
         particle.velocity.x * surfaceNormal.x +
@@ -116,11 +136,13 @@ export class Simulation {
         particle.velocity.x ** 2 + particle.velocity.y ** 2 + particle.velocity.z ** 2
       );
 
-      // if (velocityMagnitude < 0.01) {
-      //   const newParticle = createParticle();
-      //   particle.position = newParticle.position;
-      //   particle.velocity = newParticle.velocity;
-      // }
+      if (velocityMagnitude < 0.01) {
+        const newParticle = createParticle();
+        particle.position = newParticle.position;
+        particle.velocity = newParticle.velocity;
+      }
     });
+
+    this.glParticles.update(this, step);
   }
 }
