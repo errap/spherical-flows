@@ -1,15 +1,10 @@
-import { getPerlinNoiseVectorFn } from "./noise";
 import { GlParticles, GlParticlesConstructorProps } from "./glParticles";
 import { Renderer } from "./renderer";
+import { getNoiseFn, NoiseFn } from "./noise";
 
 interface PolarCoordinates {
   theta: number;
   phi: number;
-}
-
-interface Vector2D {
-  x: number;
-  y: number;
 }
 
 interface Vector3D {
@@ -26,6 +21,7 @@ interface Particle {
 }
 
 const FRICTION = 0.01;
+const NOISE_STRENGTH = 0.01;
 
 const createParticle = () => {
   // Generate random position on sphere using uniform sampling
@@ -54,11 +50,11 @@ interface SimulationConstructorProps extends GlParticlesConstructorProps {
 export class Simulation {
   private readonly glParticles: GlParticles;
   private readonly sphereRadius: number;
-  private readonly vectorField: (x: number, y: number, z: number) => Vector2D;
+  private readonly vectorField: NoiseFn;
   particles: Particle[] = [];
 
   constructor(props: SimulationConstructorProps) {
-    this.vectorField = getPerlinNoiseVectorFn({ resolution: 0.05 });
+    this.vectorField = getNoiseFn({ resolution: 0.1 });
     this.sphereRadius = props.sphereRadius;
     this.particles = new Array(props.numberOfParticles).fill(0).map(createParticle);
     this.glParticles = new GlParticles(props);
@@ -90,9 +86,10 @@ export class Simulation {
     this.particles.forEach((particle) => {
       const cartesianPosition = this.fromPolarToCartesian(particle.position);
 
-      const vectorFieldVelocity = this.vectorField(cartesianPosition.x, cartesianPosition.y, cartesianPosition.z);
-      particle.velocity.x += 0.05 * vectorFieldVelocity.x * deltaTime;
-      particle.velocity.y += 0.05 * vectorFieldVelocity.y * deltaTime;
+      const noise = this.vectorField(cartesianPosition.x, cartesianPosition.y, cartesianPosition.z);
+
+      particle.velocity.x += NOISE_STRENGTH * noise.x * deltaTime;
+      particle.velocity.y += NOISE_STRENGTH * noise.y * deltaTime;
 
       cartesianPosition.x += particle.velocity.x * deltaTime;
       cartesianPosition.y += particle.velocity.y * deltaTime;

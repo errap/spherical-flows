@@ -1,12 +1,10 @@
-import seedrandom from "./lib/seedrandom";
+import seedrandom, { PRNG } from "seedrandom";
 
-const randomSeed = () => Math.round(Math.random() * 99999999);
-
-type Generator = () => () => number;
+const randomSeed = () => `${Math.round(Math.random() * 99999999)}`;
 
 const rnd = () => {
   let seed = randomSeed();
-  let gen: Generator = null;
+  let gen: PRNG = null;
 
   const getGen = () => {
     if (gen === null) {
@@ -21,7 +19,7 @@ const rnd = () => {
     gen = seedrandom(seed);
   };
 
-  const setSeed = (newSeed: number) => {
+  const setSeed = (newSeed: string) => {
     seed = newSeed;
     gen = seedrandom(seed);
   };

@@ -1,4 +1,4 @@
-import chroma from "./lib/chroma";
+import chroma from "chroma-js";
 
 export type Gradient = ReturnType<typeof getGradient>;
 
@@ -22,16 +22,13 @@ const getChromaScaleFromCSV = (colors: string) => {
     colorsDomain.push(i / colorsArray.length);
   }
 
-  return (
-    chroma
-      // @ts-expect-error scale exists
-      .scale(colorsArray)
-      .domain(colorsDomain.map((i) => easeOutSine(i)))
-      .mode("lab")
-  );
+  return chroma
+    .scale(colorsArray)
+    .domain(colorsDomain.map((i) => easeOutSine(i)))
+    .mode("lab");
 };
 
-export const getGradient = (colorPalette: string): ((ratio: number) => { gl: () => [number, number, number] }) => {
+export const getGradient = (colorPalette: string) => {
   switch (colorPalette) {
     case "black":
       return () => chroma("#000");
@@ -42,7 +39,6 @@ export const getGradient = (colorPalette: string): ((ratio: number) => { gl: () 
     case "yellow":
       return () => chroma("yellow");
     case "spectral":
-      // @ts-expect-error scale exists
       return chroma.scale("Spectral");
     case "forest":
       return getChromaScaleFromCSV("#386641, #6a994e, #a7c957, #f2e8cf, #bc4749");
