@@ -1,6 +1,8 @@
+// simulation.ts
 import { GlParticles, GlParticlesConstructorProps } from "./glParticles";
 import { Renderer } from "./renderer";
 import { getNoiseFn, NoiseFn } from "./noise";
+import { getGradient } from "./color";
 
 interface PolarCoordinates {
   theta: number;
@@ -28,9 +30,9 @@ const createParticle = () => {
   const phi = Math.acos(2 * Math.random() - 1);
 
   // Generate random velocity in tangent plane
-  const velocityX = Math.random() * 0.1 - 0.05;
-  const velocityY = Math.random() * 0.1 - 0.05;
-  const velocityZ = Math.random() * 0.1 - 0.05;
+  const velocityX = Math.random() * 0.1 - 0.05 + Math.random() * 0.05;
+  const velocityY = Math.random() * 0.1 - 0.05 + Math.random() * 0.05;
+  const velocityZ = Math.random() * 0.1 - 0.05 + Math.random() * 0.05;
 
   return {
     position: { theta, phi },
@@ -50,15 +52,19 @@ export class Simulation {
   private readonly glParticles: GlParticles;
   private readonly sphereRadius: number;
   private readonly vectorField: NoiseFn;
+  private radius: number;
   particles: Particle[] = [];
+  private color: ReturnType<typeof getGradient>;
 
   constructor(props: SimulationConstructorProps) {
     this.vectorField = getNoiseFn({ resolution: 0.1 });
+    this.radius = props.sphereRadius;
     this.sphereRadius = props.sphereRadius;
     this.particles = new Array(props.numberOfParticles).fill(0).map(createParticle);
     this.glParticles = new GlParticles(props);
+    this.color = getGradient("bicolor");
   }
-
+  
   init() {
     this.glParticles.init({ simulation: this });
   }
@@ -81,75 +87,81 @@ export class Simulation {
     return { theta: Math.atan2(cart.y, cart.x), phi: Math.acos(cart.z / r) };
   }
 
- // simulation.ts
-update({ deltaTime, step, frequencyData }: { deltaTime: number; step: number; frequencyData: Uint8Array }) {
-  this.particles.forEach((particle) => {
-    const cartesianPosition = this.fromPolarToCartesian(particle.position);
+  update({ deltaTime, step, frequencyData }: { deltaTime: number; step: number; frequencyData: Uint8Array }) {
+    this.particles.forEach((particle) => {
+      const cartesianPosition = this.fromPolarToCartesian(particle.position);
 
-    const FRICTION = 0.01
+      // Rotate the sphere
+      const rotationAngle = deltaTime * 0.01; // Adjust the rotation speed
+      particle.position.theta += rotationAngle;
 
-    const randomAngle = Math.random() * 2 * Math.PI;
-    particle.velocity.x += Math.cos(randomAngle) * 0.01;
-    particle.velocity.y += Math.sin(randomAngle) * 0.01;
-    particle.velocity.z += Math.random() * 0.01 - 0.005;
+      // Apply subtle velocity changes to simulate gentle particle motion
+      const randomAngle = Math.random() * 2 * Math.PI;
+      particle.velocity.x += Math.cos(randomAngle) * 0.01;
+      particle.velocity.y += Math.sin(randomAngle) * 0.01;
+      particle.velocity.z += Math.random() * 0.01 - 0.005;
+
+      // Update particle position
+      cartesianPosition.x += particle.velocity.x * deltaTime;
+      cartesianPosition.y += particle.velocity.y * deltaTime;
+      cartesianPosition.z += particle.velocity.z * deltaTime;
+
+      // Calculate the distance from the center and normalize to sphere radius
+      const newRadialDistance = Math.sqrt(
+        cartesianPosition.x ** 2 + cartesianPosition.y ** 2 + cartesianPosition.z ** 2
+      );
+
+      // Create protrusions by applying a subtle radial distortion based on frequency
+      const frequencyValue = frequencyData[0] / 255; // Use the first frequency bin for simplicity
+      const protrusionStrength = (frequencyValue * 0.01) * 0.1; // Strength of the protrusion
+
+      // Apply the "spikes" effect by stretching the radius outward based on frequency
+      cartesianPosition.x *= (this.sphereRadius + protrusionStrength * 0.1) / newRadialDistance; // Reduced protrusion strength
+      cartesianPosition.y *= (this.sphereRadius + protrusionStrength * 0.1) / newRadialDistance;
+      cartesianPosition.z *= (this.sphereRadius + protrusionStrength * 0.1) / newRadialDistance;
     
-    cartesianPosition.x += particle.velocity.x * deltaTime;
-    cartesianPosition.y += particle.velocity.y * deltaTime;
-    cartesianPosition.z += particle.velocity.z * deltaTime;
+      // Update the particle's position on the sphere's surface
+      particle.position = this.fromCartesianToPolar(cartesianPosition);
 
-    // Introduce a small random variation in the initial velocity
-    particle.velocity.x += (Math.random() - 0.5) * 0.01;
-    particle.velocity.y += (Math.random() - 0.5) * 0.01;
+      // Now also update the velocity vector to keep particles tangent to the sphere
+      const surfaceNormal = {
+        x: cartesianPosition.x / this.sphereRadius,
+        y: cartesianPosition.y / this.sphereRadius,
+        z: cartesianPosition.z / this.sphereRadius,
+      };
+      const dotProduct =
+        particle.velocity.x * surfaceNormal.x +
+        particle.velocity.y * surfaceNormal.y +
+        particle.velocity.z * surfaceNormal.z;
 
-    cartesianPosition.x += particle.velocity.x * deltaTime;
-    cartesianPosition.y += particle.velocity.y * deltaTime;
-    cartesianPosition.z += particle.velocity.z * deltaTime;
+      // Subtract the normal component from the current velocity to keep it tangent to the sphere
+      particle.velocity = {
+        x: particle.velocity.x - dotProduct * surfaceNormal.x,
+        y: particle.velocity.y - dotProduct * surfaceNormal.y,
+        z: particle.velocity.z - dotProduct * surfaceNormal.z,
+      };
 
-    const newRadialDistance = Math.sqrt(
-      cartesianPosition.x ** 2 + cartesianPosition.y ** 2 + cartesianPosition.z ** 2
-    );
+      // Apply subtle friction to reduce velocity over time
+      const FRICTION = 0.01
 
-    // Normalize to move it back to the Earth's surface
-    cartesianPosition.x *= this.sphereRadius / newRadialDistance;
-    cartesianPosition.y *= this.sphereRadius / newRadialDistance;
-    cartesianPosition.z *= this.sphereRadius / newRadialDistance;
+      particle.velocity.x *= 1 - FRICTION;
+      particle.velocity.y *= 1 - FRICTION;
+      particle.velocity.z *= 1 - FRICTION;
 
-    // Update the plane's position
-    particle.position = this.fromCartesianToPolar(cartesianPosition);
+      const velocityMagnitude = Math.sqrt(
+        particle.velocity.x ** 2 + particle.velocity.y ** 2 + particle.velocity.z ** 2
+      );
 
-    // Now also update the velocity vector to reflect it being on the sphere
-    const surfaceNormal = {
-      x: cartesianPosition.x / this.sphereRadius,
-      y: cartesianPosition.y / this.sphereRadius,
-      z: cartesianPosition.z / this.sphereRadius,
-    };
-    const dotProduct =
-      particle.velocity.x * surfaceNormal.x +
-      particle.velocity.y * surfaceNormal.y +
-      particle.velocity.z * surfaceNormal.z;
+      // Reset particle if its velocity is very low
+      if (velocityMagnitude < 0.01) {
+        const newParticle = createParticle();
+        particle.position = newParticle.position;
+        particle.velocity = newParticle.velocity;
+      }
+    });
 
-    // Subtract the normal component from the current velocity to keep it tangent to the sphere
-    particle.velocity = {
-      x: particle.velocity.x - dotProduct * surfaceNormal.x,
-      y: particle.velocity.y - dotProduct * surfaceNormal.y,
-      z: particle.velocity.z - dotProduct * surfaceNormal.z,
-    };
-
-    particle.velocity.x *= 1 - FRICTION;
-    particle.velocity.y *= 1 - FRICTION;
-    particle.velocity.z *= 1 - FRICTION;
-
-    const velocityMagnitude = Math.sqrt(
-      particle.velocity.x ** 2 + particle.velocity.y ** 2 + particle.velocity.z ** 2
-    );
-
-    if (velocityMagnitude < 0.01) {
-      const newParticle = createParticle();
-      particle.position = newParticle.position;
-      particle.velocity = newParticle.velocity;
-    }
-  });
-
-  this.glParticles.update(this, step, frequencyData);
-}
+    // Subtle radius change based on frequency data
+    this.radius = this.sphereRadius * (1 + frequencyData[0] / 255 * 0.5); // Scale the radius slightly
+    this.glParticles.update(this, step, frequencyData, this.radius, parseInt(this.color(0.5).hex(), 16));
+  }
 }
