@@ -20,7 +20,6 @@ interface Particle {
   velocity: Vector3D;
 }
 
-const FRICTION = 0.01;
 const NOISE_STRENGTH = 0.01;
 
 const createParticle = () => {
@@ -29,9 +28,9 @@ const createParticle = () => {
   const phi = Math.acos(2 * Math.random() - 1);
 
   // Generate random velocity in tangent plane
-  const velocityX = Math.random() * 0.01 - 0.005;
-  const velocityY = Math.random() * 0.001 - 0.0005;
-  const velocityZ = Math.random() * 0.001 - 0.0005;
+  const velocityX = Math.random() * 0.1 - 0.05;
+  const velocityY = Math.random() * 0.1 - 0.05;
+  const velocityZ = Math.random() * 0.1 - 0.05;
 
   return {
     position: { theta, phi },
@@ -82,64 +81,75 @@ export class Simulation {
     return { theta: Math.atan2(cart.y, cart.x), phi: Math.acos(cart.z / r) };
   }
 
-  update({ deltaTime, step }: { deltaTime: number; step: number }) {
-    this.particles.forEach((particle) => {
-      const cartesianPosition = this.fromPolarToCartesian(particle.position);
+ // simulation.ts
+update({ deltaTime, step, frequencyData }: { deltaTime: number; step: number; frequencyData: Uint8Array }) {
+  this.particles.forEach((particle) => {
+    const cartesianPosition = this.fromPolarToCartesian(particle.position);
 
-      const noise = this.vectorField(cartesianPosition.x, cartesianPosition.y, cartesianPosition.z);
+    const FRICTION = 0.01
 
-      particle.velocity.x += NOISE_STRENGTH * noise.x * deltaTime;
-      particle.velocity.y += NOISE_STRENGTH * noise.y * deltaTime;
+    const randomAngle = Math.random() * 2 * Math.PI;
+    particle.velocity.x += Math.cos(randomAngle) * 0.01;
+    particle.velocity.y += Math.sin(randomAngle) * 0.01;
+    particle.velocity.z += Math.random() * 0.01 - 0.005;
+    
+    cartesianPosition.x += particle.velocity.x * deltaTime;
+    cartesianPosition.y += particle.velocity.y * deltaTime;
+    cartesianPosition.z += particle.velocity.z * deltaTime;
 
-      cartesianPosition.x += particle.velocity.x * deltaTime;
-      cartesianPosition.y += particle.velocity.y * deltaTime;
-      cartesianPosition.z += particle.velocity.z * deltaTime;
+    // Introduce a small random variation in the initial velocity
+    particle.velocity.x += (Math.random() - 0.5) * 0.01;
+    particle.velocity.y += (Math.random() - 0.5) * 0.01;
 
-      const newRadialDistance = Math.sqrt(
-        cartesianPosition.x ** 2 + cartesianPosition.y ** 2 + cartesianPosition.z ** 2
-      );
+    cartesianPosition.x += particle.velocity.x * deltaTime;
+    cartesianPosition.y += particle.velocity.y * deltaTime;
+    cartesianPosition.z += particle.velocity.z * deltaTime;
 
-      // Normalize to move it back to the Earth's surface
-      cartesianPosition.x *= this.sphereRadius / newRadialDistance;
-      cartesianPosition.y *= this.sphereRadius / newRadialDistance;
-      cartesianPosition.z *= this.sphereRadius / newRadialDistance;
+    const newRadialDistance = Math.sqrt(
+      cartesianPosition.x ** 2 + cartesianPosition.y ** 2 + cartesianPosition.z ** 2
+    );
 
-      // Update the plane's position
-      particle.position = this.fromCartesianToPolar(cartesianPosition);
+    // Normalize to move it back to the Earth's surface
+    cartesianPosition.x *= this.sphereRadius / newRadialDistance;
+    cartesianPosition.y *= this.sphereRadius / newRadialDistance;
+    cartesianPosition.z *= this.sphereRadius / newRadialDistance;
 
-      // Now also update the velocity vector to reflect it being on the sphere
-      const surfaceNormal = {
-        x: cartesianPosition.x / this.sphereRadius,
-        y: cartesianPosition.y / this.sphereRadius,
-        z: cartesianPosition.z / this.sphereRadius,
-      };
-      const dotProduct =
-        particle.velocity.x * surfaceNormal.x +
-        particle.velocity.y * surfaceNormal.y +
-        particle.velocity.z * surfaceNormal.z;
+    // Update the plane's position
+    particle.position = this.fromCartesianToPolar(cartesianPosition);
 
-      // Subtract the normal component from the current velocity to keep it tangent to the sphere
-      particle.velocity = {
-        x: particle.velocity.x - dotProduct * surfaceNormal.x,
-        y: particle.velocity.y - dotProduct * surfaceNormal.y,
-        z: particle.velocity.z - dotProduct * surfaceNormal.z,
-      };
+    // Now also update the velocity vector to reflect it being on the sphere
+    const surfaceNormal = {
+      x: cartesianPosition.x / this.sphereRadius,
+      y: cartesianPosition.y / this.sphereRadius,
+      z: cartesianPosition.z / this.sphereRadius,
+    };
+    const dotProduct =
+      particle.velocity.x * surfaceNormal.x +
+      particle.velocity.y * surfaceNormal.y +
+      particle.velocity.z * surfaceNormal.z;
 
-      particle.velocity.x *= 1 - FRICTION;
-      particle.velocity.y *= 1 - FRICTION;
-      particle.velocity.z *= 1 - FRICTION;
+    // Subtract the normal component from the current velocity to keep it tangent to the sphere
+    particle.velocity = {
+      x: particle.velocity.x - dotProduct * surfaceNormal.x,
+      y: particle.velocity.y - dotProduct * surfaceNormal.y,
+      z: particle.velocity.z - dotProduct * surfaceNormal.z,
+    };
 
-      const velocityMagnitude = Math.sqrt(
-        particle.velocity.x ** 2 + particle.velocity.y ** 2 + particle.velocity.z ** 2
-      );
+    particle.velocity.x *= 1 - FRICTION;
+    particle.velocity.y *= 1 - FRICTION;
+    particle.velocity.z *= 1 - FRICTION;
 
-      if (velocityMagnitude < 0.01) {
-        const newParticle = createParticle();
-        particle.position = newParticle.position;
-        particle.velocity = newParticle.velocity;
-      }
-    });
+    const velocityMagnitude = Math.sqrt(
+      particle.velocity.x ** 2 + particle.velocity.y ** 2 + particle.velocity.z ** 2
+    );
 
-    this.glParticles.update(this, step);
-  }
+    if (velocityMagnitude < 0.01) {
+      const newParticle = createParticle();
+      particle.position = newParticle.position;
+      particle.velocity = newParticle.velocity;
+    }
+  });
+
+  this.glParticles.update(this, step, frequencyData);
+}
 }

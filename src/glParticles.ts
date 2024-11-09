@@ -91,28 +91,28 @@ export class GlParticles {
     renderer.add({ scene: this.scene, camera: this.camera }, { addControls: true });
   }
 
-  update(simulation: Simulation, step: number) {
-    const positions = this.points.geometry.attributes.position.array;
-    const colors = this.points.geometry.attributes.color.array;
+// glParticles.ts
+update(simulation: Simulation, step: number, frequencyData: Uint8Array) {
+  const positions = this.points.geometry.attributes.position.array;
+  const colors = this.points.geometry.attributes.color.array;
 
-    simulation.particles.forEach((particle, index) => {
-      positions[index * 3] = this.sphereRadius * Math.sin(particle.position.phi) * Math.cos(particle.position.theta);
-      positions[index * 3 + 1] =
-        this.sphereRadius * Math.sin(particle.position.phi) * Math.sin(particle.position.theta);
-      positions[index * 3 + 2] = this.sphereRadius * Math.cos(particle.position.phi);
+  simulation.particles.forEach((particle, index) => {
+    positions[index * 3] = this.sphereRadius * Math.sin(particle.position.phi) * Math.cos(particle.position.theta);
+    positions[index * 3 + 1] =
+      this.sphereRadius * Math.sin(particle.position.phi) * Math.sin(particle.position.theta);
+    positions[index * 3 + 2] = this.sphereRadius * Math.cos(particle.position.phi);
 
-      // Map the speed to a color (red-ish for higher speeds)
-      const color = this.gradient(step / 2000).gl();
-      // const color = new THREE.Color();
-      // color.setHSL(0.15, 0.7, 0.5); // Adjust the HSL values as needed for desired effect
-      // color.setHSL(speed * 20, speed * 255, speed * 255); // Adjust the HSL values as needed for desired effect
+    // Use frequency data to adjust color
+    const frequencyIndex = Math.floor((index / simulation.particles.length) * frequencyData.length);
+    const frequencyValue = frequencyData[frequencyIndex] / 255;
+    const color = this.gradient(frequencyValue).gl();
 
-      colors[index * 3] = color[0];
-      colors[index * 3 + 1] = color[1];
-      colors[index * 3 + 2] = color[2];
-    });
+    colors[index * 3] = color[0];
+    colors[index * 3 + 1] = color[1];
+    colors[index * 3 + 2] = color[2];
+  });
 
-    this.points.geometry.attributes.position.needsUpdate = true;
-    this.points.geometry.attributes.color.needsUpdate = true;
-  }
+  this.points.geometry.attributes.position.needsUpdate = true;
+  this.points.geometry.attributes.color.needsUpdate = true;
+}
 }
