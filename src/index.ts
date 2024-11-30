@@ -8,11 +8,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const main = async () => {
       const renderer = new Renderer();
       const simulation = new Simulation({
-          numberOfParticles: 100000,
+          numberOfParticles: 10000, // smaller number of particles leads to less lag
           sphereRadius: 50,
           backgroundColor: 0x000,
-          particleSize: 0.01,
-          gradient: getGradient("spectral"),
+          particleSize: 0.02, // bigger number for bigger particles
+          gradient: getGradient("fire"), // try spectral, ice etc. for other options
       });
       const fade = new Fade({ alpha: 0.05 });
 
