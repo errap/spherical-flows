@@ -56,8 +56,11 @@ export class GlParticles {
   
       this.vertices.push(x, y, z);
   
-      const color = new THREE.Color();
-      color.setHSL(0.1, 0.8, 0.7); // Warm color
+      const color = new THREE.Color(0xff4500); // Warm orange
+      this.colors.push(color.r, color.g, color.b);
+
+      // const color = new THREE.Color();
+      // color.setHSL(0.1, 0.8, 0.7); // Warm color
   
       this.colors.push(color.r, color.g, color.b);
     });
@@ -81,6 +84,69 @@ export class GlParticles {
     renderer.add({ scene: this.scene, camera: this.camera }, { addControls: true });
   }
 
+/* Uses frequency bands to give more dynamic range of movement and color change to the sphere.
+Instead of relying on a single frequency (e.g., the first bin), it aggregates data from bass, mids, and highs. 
+This ensures the sphere reacts to a broader range of sounds, even if one band (e.g., volume) is relatively constant.
+This is good for electronic music like techno where the volume doesn't change much.
+
+
+Also added is sine-based pulsing (Math.sin(step * 0.05)) for periodic variations to color intensity and shape, 
+even when the audio signal is steady. This keeps the visuals engaging regardless of musical changes.
+*/
+  update(simulation: Simulation, step: number, frequencyData: Uint8Array, radius: number, color: number) {
+    const positions = this.points.geometry.attributes.position.array;
+    const colors = this.points.geometry.attributes.color.array;
+
+    // Analyze multiple frequency bands for a richer dynamic range
+    const bass = frequencyData.slice(0, 20).reduce((a, b) => a + b, 0) / 20 / 255; // Bass (low frequencies)
+    const mids = frequencyData.slice(20, 40).reduce((a, b) => a + b, 0) / 20 / 255; // Mids
+    const highs = frequencyData.slice(40, 60).reduce((a, b) => a + b, 0) / 20 / 255; // Highs
+
+    // Combine frequencies for overall intensity
+    const frequencyValue = (bass * 0.5 + mids * 0.3 + highs * 0.2); // Weighted average
+
+    // Sphere radius pulsation based on frequency
+    const radiusPulse = this.sphereRadius * (1 + frequencyValue * 0.03);
+
+    // Dynamic spike pulse effect for additional shape variation
+    const spikePulse = Math.sin(frequencyValue * Math.PI * 4) * 2;
+
+    // Combine effects into dynamic radius
+    const dynamicRadius = radiusPulse + spikePulse;
+
+    // Earth rotation effect
+    const rotationAngle = step * 0.002;
+
+    simulation.particles.forEach((particle, index) => {
+        // Update particle positions
+        positions[index * 3] = dynamicRadius * Math.sin(particle.position.phi) * Math.cos(particle.position.theta + rotationAngle);
+        positions[index * 3 + 1] = dynamicRadius * Math.sin(particle.position.phi) * Math.sin(particle.position.theta + rotationAngle);
+        positions[index * 3 + 2] = dynamicRadius * Math.cos(particle.position.phi);
+
+        // Particle speed influences intensity
+        const speed = Math.sqrt(particle.velocity.x ** 2 + particle.velocity.y ** 2 + particle.velocity.z ** 2);
+        const colorIntensity = Math.min(1, frequencyValue + speed * 0.2);
+
+        // Add subtle pulsing to color intensity
+        const colorIntensityPulse = Math.sin(step * 0.05) * 0.3 + 0.5;
+        const finalColorIntensity = Math.min(1, colorIntensity * colorIntensityPulse);
+
+        // Use gradient to calculate particle color
+        const particleColor = this.gradient(finalColorIntensity).gl();
+
+        // Update particle color
+        colors[index * 3] = particleColor[0];
+        colors[index * 3 + 1] = particleColor[1];
+        colors[index * 3 + 2] = particleColor[2];
+    });
+
+    // Mark attributes as needing updates
+    this.points.geometry.attributes.position.needsUpdate = true;
+    this.points.geometry.attributes.color.needsUpdate = true;
+}
+
+
+  /*
   update(simulation: Simulation, step: number, frequencyData: Uint8Array, radius: number, color: number) {
     const positions = this.points.geometry.attributes.position.array;
     const colors = this.points.geometry.attributes.color.array;
@@ -129,5 +195,5 @@ export class GlParticles {
     this.points.geometry.attributes.position.needsUpdate = true;
     this.points.geometry.attributes.color.needsUpdate = true;
 }
-
+*/
 }
